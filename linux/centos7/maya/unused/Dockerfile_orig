@@ -1,0 +1,31 @@
+############################################################
+# Dockerfile to install maya2018
+# Based on nvidia/base:centos7-usd-0.8
+
+FROM usd-docker/vfx:latest-centos7
+
+##ARG current_host_ip_address
+ARG maya_version
+
+LABEL maya.version="${maya_version}.0" maintainer="Animal Logic"
+
+ENV MAYA_LOCATION=$BUILD_DIR/maya${maya_version}DevKit
+
+ENV MAYA_LIBRARY_DIR=$BUILD_DIR/maya${maya_version}DevKit
+ENV MAYA_INCLUDE_DIR=$BUILD_DIR/maya${maya_version}DevKit/include
+
+##ENV HTTP_HOSTNAME=$current_host_ip_address
+ENV MAYA_EXECUTABLE=$MAYA_LOCATION/bin/maya
+ENV MAYA_PYTHON_EXECUTABLE=$MAYA_LOCATION/bin/maya
+ENV MAYA_MAJOR_VERSION="${maya_version}"
+
+COPY scripts/build_maya.sh scripts/download_maya.sh /tmp/
+
+# To remove, the maya tar.gz didn't have th correct name on first build. Dirty fix here to avoid recompiling everything
+RUN mv -f /tmp/usd-downloads/Maya_2019_DEVKIT_Linux.tgz /tmp/usd-downloads/Maya2019_DEVKIT_Linux.tgz
+
+#RUN /tmp/download_maya.sh && \
+RUN  /tmp/build_maya.sh
+
+# Get maya and mayapy executable from host installation
+COPY bin $MAYA_LOCATION/bin

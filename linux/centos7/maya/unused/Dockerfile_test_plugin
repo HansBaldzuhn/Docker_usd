@@ -1,0 +1,9 @@
+############################################################
+# Dockerfile to test usd plugin inside maya
+
+FROM usd-docker/maya-usd:latest-centos7
+
+
+COPY scripts/maya_usd_test.py /tmp/
+
+RUN python /tmp/maya_usd_test.py

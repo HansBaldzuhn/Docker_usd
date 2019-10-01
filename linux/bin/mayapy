@@ -1,0 +1,9 @@
+#!/bin/sh
+
+path="$(cd "$(dirname "$0")" && pwd -P)"
+pythonhome=$path/..
+export PYTHONHOME=$pythonhome
+export LD_LIBRARY_PATH=$path/../lib:$LD_LIBRARY_PATH
+export MAYA_LOCATION=$path/..
+export QT_PLUGIN_PATH=$path/../qt-plugins
+exec $path/python-bin "$@"

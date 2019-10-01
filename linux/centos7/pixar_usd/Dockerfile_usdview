@@ -1,0 +1,14 @@
+
+FROM usd-docker/adsk_maya-usd_shared:latest-centos7
+
+RUN yum install -y cuda-drivers
+
+# Create a user to start the app
+ENV USER_NAME=toto
+ENV USER_HOME=/home/${USER_NAME}
+RUN groupadd test && \
+	useradd ${USER_NAME} -d ${USER_HOME} -g test -m
+	
+USER ${USER_NAME}
+ENV HOME ${USER_HOME}
+# ENV QT_X11_NO_MITSHM=1

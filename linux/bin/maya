@@ -1,0 +1,219 @@
+#!/bin/bash -f
+#Tag 0x00C98a00
+#*
+#*+***********************************************************************
+#*
+#*  Module:
+#*	maya
+#*
+#*-***********************************************************************
+#*
+
+maya_exec=maya.bin
+
+
+#
+#  Determine if launched from the desktop or a shell.  This will tell
+#  us how to display error messages later.
+#
+
+tty=1
+
+OSname=$(/bin/uname -s)
+
+if [ "$OSname" = Linux ]; then
+        lib=lib
+        lsFlags='-l'
+else
+        echo "Maya is not supported on $OSname."
+        exit 1
+fi
+
+#
+#       Parse the argument list
+#
+
+mayaArgs=""
+mayaApp=""
+debuggerArgs=""
+
+while [[ $# -gt 0 ]]
+    do
+    key="$1"
+
+    case $key in
+       -d)
+            if [ $# -le 1 ]; then
+                if [ $tty = 1 ]; then
+                    echo "No debugger specified"
+                fi
+            fi
+            shift
+            dbgApp=$1
+            ;;
+        -dbgArg)
+            shift
+            debuggerArgs="${debuggerArgs} $1"
+            ;;
+        -data)
+            mayaArgs="${mayaArgs} $1"
+            ;;
+        -d*)
+            dbgApp=$(echo "$1" | cut -c3-)
+            ;;
+        *)
+            # unknown option
+            mayaArgs="${mayaArgs} '$1'"
+            ;;
+    esac
+  shift # past argument or value
+done
+
+
+#
+#  If the MAYA_LOCATION is set, use it.  Otherwise, determine it.
+#
+if [ ! -z ${MAYA_LOCATION+x} ]; then
+    if [ -x ${MAYA_LOCATION}/bin/${maya_exec} ]; then
+        maya=${MAYA_LOCATION}/bin/${maya_exec}
+    else
+        unset MAYA_LOCATION
+    fi
+fi
+
+
+
+if [ -z ${MAYA_LOCATION+x} ]; then
+    #
+    #  Create the full pathname of the invoked binary.
+    #
+
+    if [[ "$0" == /* ]]; then
+                me="$0"
+    else
+                me=$(pwd)/$0
+    fi
+
+    #
+    #  If it's a link, find the actual file.
+    #  Follow the link(s) until an acutal file is found
+
+    while [ -h "$me" ]; do
+        linkdirname=$(dirname "$me")
+        me=$(ls "$lsFlags" "$me" | tr ' ' '\012' | tail -n 1)
+        if [[ ! "$me" == /* ]]; then
+            me="$linkdirname/$me"
+        fi
+    done
+
+    #
+    #  Binary should be in $MAYA_LOCATION/bin.  Verify that.
+    #
+
+    bindir=$(dirname "$me")
+    if [ -d "$bindir" ]; then
+                bindir=$(cd "$bindir"; echo "$PWD")
+    fi
+    binfile=$(basename "$bindir")
+    if [ "$binfile" == "bin" ]; then
+        # We cannot call export directly if there are spaces in the Path.
+        # We must use a temp variable.
+        maya_loc=$(dirname "$bindir")
+        export MAYA_LOCATION="$maya_loc"
+        if [ -x "${MAYA_LOCATION}/bin/${maya_exec}" ]; then
+            maya="${MAYA_LOCATION}/bin/${maya_exec}"
+        else
+            unset MAYA_LOCATION
+        fi
+    fi
+fi
+
+#
+#  This allows Maya to save SGI format image files with matte.
+
+export WF_IMF_SGI_MATTE=1
+
+#
+#	101914: color correction needed for Cineon files.
+
+export WF_IMF_CIN_CORRECTION=both
+export WF_IMF_CIN_WHITE_POINT=685
+
+# Set up the location of the libquicktime plugins
+export LIBQUICKTIME_PLUGIN_DIR="$MAYA_LOCATION/lib/libquicktime"
+
+# Turn on tablet event compression by default to solve viewport 
+export QT_COMPRESS_TABLET_EVENTS=1
+
+#
+# Set up the location of the DSO's and run
+#
+if [ "$MAYA_LOCATION" ]; then
+    if [ ! -z ${LD_LIBRARY_PATH+x} ]; then
+        export LD_LIBRARY_PATH="$MAYA_LOCATION/lib:$LD_LIBRARY_PATH"
+    else
+        export LD_LIBRARY_PATH="$MAYA_LOCATION/lib"
+    fi
+
+    # Prepend modules lib to LD_LIBRARY_PATH or LD_LIBRARYN32_PATH
+    # See Manitoba/Apps/maya.cpp for OSX
+    for moduleDir in "$MAYA_LOCATION/plug-ins"/* ; do
+        if [ -d "$moduleDir" ] && [ -d "$moduleDir/lib" ]; then
+            if [ ! -z ${LD_LIBRARY_PATH+x} ]; then
+                export LD_LIBRARY_PATH="$moduleDir/lib:$LD_LIBRARY_PATH"
+            else
+                export LD_LIBRARY_PATH="$moduleDir/lib"
+            fi
+        fi
+    done
+
+        if [ "$mayaApp" != "" ]; then
+                maya="${mayaApp}";
+        fi
+
+    if [ -x "$maya" ]; then
+        if [ ! -z ${dbgApp+x}  ]; then
+            #echo "debugging: ${maya}"
+            export AW_DEBUGGING=F
+            export MAYA_DEBUG_NO_SIGNAL_HANDLERS=1
+            echo "Executing: ${dbgApp} ${debuggerArgs} ${maya}"
+            if [[ ! "${mayaArgs}" =~ "" ]]; then
+                echo "Maya args: ${mayaArgs}"
+            fi
+            eval "${dbgApp}" "${debuggerArgs}" "${maya}" "${mayaArgs}"
+            exit "$?"
+        else
+            #echo "running: ${maya}"
+            noSpaceMaya=$(echo $maya | sed -e 's/ /\\ /g')
+            eval "$noSpaceMaya" "${mayaArgs}"
+            exit "$?"
+        fi
+    fi
+fi
+
+if [ ! $maya ]; then
+    set maya = "${maya_exec}"
+fi
+
+if [ "$tty" == 1 ]; then
+    echo The Maya executable \(\`${maya}\'\) cannot be found
+fi
+exit 1
+
+
+#*+
+#* ==========================================================================
+#* The information  in  this  file is  provided for the  exclusive use of the
+#* licensees of Alias Systems Corp. Such users have the right to use, modify,
+#* and  incorporate this code  into  other  products  for purposes authorized
+#* by the  Alias Systems Corp. license agreement, without fee.
+#*
+#* Alias Systems Corp. disclaims all warranties with regard to this software,
+#* including all implied warranties  of  merchantability and  fitness.  In no
+#* event  shall  Alias Systems Corp. be liable for any  special,  indirect or
+#* consequential  damages  or  any  damages whatsoever resulting from loss of
+#* use, data  or profits, whether in  an  action of  contract,  negligence or
+#* other tortious  action,  arising out of or  in connection  with the use or
+#* performance of this software.
+#* ==========================================================================
+#*-
